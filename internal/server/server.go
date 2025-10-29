@@ -4,14 +4,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"net/http"
-	"time"
-
 	"github.com/aisa-it/aiplan-mem/internal/config"
+	"github.com/aisa-it/aiplan-mem/internal/dao"
 	"github.com/aisa-it/aiplan-mem/internal/db"
 	"github.com/gofrs/uuid/v5"
 	"github.com/labstack/echo/v4"
+	"log/slog"
+	"net/http"
 )
 
 type Server struct {
@@ -36,9 +35,9 @@ func RunServer(cfg *config.Config, ds *db.DataStore) {
 		lastSeenGroup.POST("/:userId", s.postUserLastSeen)
 	}
 
-	emailCodeGroup := e.Group("/lastSeen")
+	emailCodeGroup := e.Group("/emailCodes")
 	{
-		emailCodeGroup.GET("/:userId", s.getEmailCode)
+		emailCodeGroup.POST("/:userId/verify/", s.verifyEmailCode)
 		emailCodeGroup.POST("/:userId", s.saveEmailCode)
 	}
 
@@ -100,39 +99,35 @@ func (s *Server) postUserLastSeen(c echo.Context) error {
 }
 
 // EmailCodes handlers
-type SaveEmailCodeRequest struct {
-	NewEmail  string        `json:"new_email"`
-	Code      string        `json:"code"`
-	ExpiresIn time.Duration `json:"expires_in"`
-}
 
 func (s *Server) saveEmailCode(c echo.Context) error {
 	userId := uuid.FromStringOrNil(c.Param("userId"))
+	email := c.QueryParam("email")
 
-	var req SaveEmailCodeRequest
-	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-		return sendError(c, err)
-	}
-
-	if err := s.DataStore.EmailCodes.SaveCode(userId, req.NewEmail, req.Code, req.ExpiresIn); err != nil {
-		return sendError(c, err)
-	}
-
-	return c.NoContent(http.StatusOK)
-}
-
-func (s *Server) getEmailCode(c echo.Context) error {
-	userId := uuid.FromStringOrNil(c.Param("userId"))
-
-	codeData, err := s.DataStore.EmailCodes.GetCode(userId)
+	data, err := s.DataStore.EmailCodes.GenCode(userId, email)
 	if err != nil {
 		return sendError(c, err)
 	}
 
-	if codeData == nil {
-		return c.NoContent(http.StatusNotFound)
+	return c.JSON(http.StatusOK, data)
+}
+
+func (s *Server) verifyEmailCode(c echo.Context) error {
+	userId := uuid.FromStringOrNil(c.Param("userId"))
+
+	var req dao.EmailCodeData
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return sendError(c, err)
 	}
 
-	return c.JSON(http.StatusOK, codeData)
+	verify, err := s.DataStore.EmailCodes.VerifyCode(userId, req.NewEmail, req.Code)
+	if err != nil {
+		return sendError(c, err)
+	}
 
+	if !verify {
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	return c.NoContent(http.StatusOK)
 }
