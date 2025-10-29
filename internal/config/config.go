@@ -7,6 +7,7 @@ import (
 const (
 	SessionsBlaclistBucket = "sessionsBlacklist"
 	LastSeenBucket         = "userLastSeen"
+	EmailCodesBucket       = "emailCodes"
 )
 
 type Config struct {

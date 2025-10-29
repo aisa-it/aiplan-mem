@@ -2,9 +2,11 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/aisa-it/aiplan-mem/internal/config"
 	"github.com/aisa-it/aiplan-mem/internal/db"
@@ -32,6 +34,12 @@ func RunServer(cfg *config.Config, ds *db.DataStore) {
 	{
 		lastSeenGroup.GET("/:userId", s.getUserLastSeen)
 		lastSeenGroup.POST("/:userId", s.postUserLastSeen)
+	}
+
+	emailCodeGroup := e.Group("/lastSeen")
+	{
+		emailCodeGroup.GET("/:userId", s.getEmailCode)
+		emailCodeGroup.POST("/:userId", s.saveEmailCode)
 	}
 
 	if err := e.Start(cfg.ListenAddr); err != nil {
@@ -89,4 +97,42 @@ func (s *Server) postUserLastSeen(c echo.Context) error {
 		return sendError(c, err)
 	}
 	return c.NoContent(http.StatusOK)
+}
+
+// EmailCodes handlers
+type SaveEmailCodeRequest struct {
+	NewEmail  string        `json:"new_email"`
+	Code      string        `json:"code"`
+	ExpiresIn time.Duration `json:"expires_in"`
+}
+
+func (s *Server) saveEmailCode(c echo.Context) error {
+	userId := uuid.FromStringOrNil(c.Param("userId"))
+
+	var req SaveEmailCodeRequest
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return sendError(c, err)
+	}
+
+	if err := s.DataStore.EmailCodes.SaveCode(userId, req.NewEmail, req.Code, req.ExpiresIn); err != nil {
+		return sendError(c, err)
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func (s *Server) getEmailCode(c echo.Context) error {
+	userId := uuid.FromStringOrNil(c.Param("userId"))
+
+	codeData, err := s.DataStore.EmailCodes.GetCode(userId)
+	if err != nil {
+		return sendError(c, err)
+	}
+
+	if codeData == nil {
+		return c.NoContent(http.StatusNotFound)
+	}
+
+	return c.JSON(http.StatusOK, codeData)
+
 }

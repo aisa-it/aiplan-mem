@@ -1,6 +1,7 @@
 package db
 
 import (
+	emailcodes "github.com/aisa-it/aiplan-mem/internal/db/email-codes"
 	"log/slog"
 	"os"
 	"time"
@@ -14,7 +15,8 @@ import (
 type DataStore struct {
 	db *bolt.DB
 
-	Sessions *sessions.SessionsStore
+	Sessions   *sessions.SessionsStore
+	EmailCodes *emailcodes.EmailCodesStore
 }
 
 func OpenDB(cfg *config.Config) (*DataStore, error) {
@@ -24,7 +26,11 @@ func OpenDB(cfg *config.Config) (*DataStore, error) {
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(config.SessionsBlaclistBucket))
+		_, err := tx.CreateBucketIfNotExists([]byte(config.EmailCodesBucket))
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists([]byte(config.SessionsBlaclistBucket))
 		if err != nil {
 			return err
 		}
@@ -35,7 +41,9 @@ func OpenDB(cfg *config.Config) (*DataStore, error) {
 		os.Exit(1)
 	}
 
-	return &DataStore{db: db, Sessions: sessions.NewSessionsStore(db, cfg)}, nil
+	return &DataStore{db: db,
+		Sessions:   sessions.NewSessionsStore(db, cfg),
+		EmailCodes: emailcodes.NewEmailCodesStore(db)}, nil
 }
 
 func (ds DataStore) Close() error {
