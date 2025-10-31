@@ -2,11 +2,16 @@ package config
 
 import (
 	"os"
+	"time"
 )
 
 const (
 	SessionsBlaclistBucket = "sessionsBlacklist"
 	LastSeenBucket         = "userLastSeen"
+	EmailCodesBucket       = "emailCodes"
+
+	EmailCodeLifeTime time.Duration = time.Minute * 5
+	EmailCodeLimitReq               = time.Minute
 )
 
 type Config struct {
