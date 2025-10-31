@@ -20,15 +20,14 @@ func NewEmailCodesStore(db *bolt.DB) *EmailCodesStore {
 	return &EmailCodesStore{db: db}
 }
 
-func (ecs *EmailCodesStore) GenCode(userID uuid.UUID, newEmail string) (*dao.EmailCodeData, error) {
-
+func (ecs *EmailCodesStore) GenCode(userID uuid.UUID, newEmail string) (string, error) {
 	var codeData *dao.EmailCodeData
 	data := dao.EmailCodeData{
 		NewEmail:  newEmail,
 		Code:      utils.GenCode(),
 		CreatedAt: time.Now(),
 	}
-	return &data, ecs.db.Update(func(tx *bolt.Tx) error {
+	return data.Code, ecs.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(config.EmailCodesBucket))
 
 		jsonDataOld := b.Get(userID.Bytes())
@@ -38,7 +37,7 @@ func (ecs *EmailCodesStore) GenCode(userID uuid.UUID, newEmail string) (*dao.Ema
 			}
 
 			if codeData.CreatedAt.Add(config.EmailCodeLimitReq).After(time.Now()) {
-				return apierror.ErrLimitEmailCodeReached
+				return apierror.ErrEmailCodeTooSoon
 			}
 		}
 

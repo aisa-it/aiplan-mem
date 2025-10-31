@@ -37,7 +37,7 @@ func RunServer(cfg *config.Config, ds *db.DataStore) {
 
 	emailCodeGroup := e.Group("/emailCodes")
 	{
-		emailCodeGroup.POST("/:userId/verify/", s.verifyEmailCode)
+		emailCodeGroup.POST("/:userId/verify", s.verifyEmailCode)
 		emailCodeGroup.POST("/:userId", s.saveEmailCode)
 	}
 
@@ -104,12 +104,13 @@ func (s *Server) saveEmailCode(c echo.Context) error {
 	userId := uuid.FromStringOrNil(c.Param("userId"))
 	email := c.QueryParam("email")
 
-	data, err := s.DataStore.EmailCodes.GenCode(userId, email)
+	code, err := s.DataStore.EmailCodes.GenCode(userId, email)
 	if err != nil {
 		return sendError(c, err)
 	}
 
-	return c.JSON(http.StatusOK, data)
+	c.Response().Header().Set("code", fmt.Sprint(code))
+	return c.NoContent(http.StatusOK)
 }
 
 func (s *Server) verifyEmailCode(c echo.Context) error {
@@ -122,12 +123,9 @@ func (s *Server) verifyEmailCode(c echo.Context) error {
 
 	verify, err := s.DataStore.EmailCodes.VerifyCode(userId, req.NewEmail, req.Code)
 	if err != nil {
-		return sendError(c, err)
+		c.Response().Header().Set("error", fmt.Sprint(err.Error()))
 	}
 
-	if !verify {
-		return c.NoContent(http.StatusBadRequest)
-	}
-
+	c.Response().Header().Set("verify", fmt.Sprint(verify))
 	return c.NoContent(http.StatusOK)
 }

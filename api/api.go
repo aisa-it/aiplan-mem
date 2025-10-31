@@ -75,23 +75,13 @@ func (a *AIPlanMemAPI) GetUserLastSeenTime(userId uuid.UUID) (time.Time, error) 
 }
 
 // EmailCodes methods
-func (a *AIPlanMemAPI) SaveEmailCode(userID uuid.UUID, newEmail string) (*dao.EmailCodeData, error) {
+func (a *AIPlanMemAPI) SaveEmailCode(userID uuid.UUID, newEmail string) (string, error) {
 	if a.isModule {
 		return a.ds.EmailCodes.GenCode(userID, newEmail)
 	}
 
-	resp, err := a.postRequestWithResponse("/emailCodes/"+userID.String()+"?email="+url.QueryEscape(newEmail), nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var codeData dao.EmailCodeData
-	if err := json.NewDecoder(resp.Body).Decode(&codeData); err != nil {
-		return nil, err
-	}
-
-	return &codeData, nil
+	h, err := a.postRequestWithResponseHeader("/emailCodes/" + userID.String() + "?email=" + url.QueryEscape(newEmail))
+	return h.Get("code"), err
 }
 
 func (a *AIPlanMemAPI) VerifyEmailCode(userID uuid.UUID, email, code string) (bool, error) {
@@ -106,13 +96,12 @@ func (a *AIPlanMemAPI) VerifyEmailCode(userID uuid.UUID, email, code string) (bo
 	}
 	jsonData, _ := json.Marshal(data)
 
-	resp, err := a.postRequestWithResponse("/emailCodes/"+userID.String()+"/verify/", jsonData)
+	resp, err := a.postRequestWithResponse("/emailCodes/"+userID.String()+"/verify", jsonData)
 	if err != nil {
 		return false, err
 	}
 	defer resp.Body.Close()
-
-	return resp.StatusCode == http.StatusOK, nil
+	return resp.Header.Get("verify") == "true", nil
 }
 
 //-------------------
@@ -126,10 +115,6 @@ func (a *AIPlanMemAPI) getRequest(path string) (http.Header, error) {
 	return resp.Header, nil
 }
 
-func (a *AIPlanMemAPI) getRequestWithBody(path string) (*http.Response, error) {
-	return http.Get(a.addr.ResolveReference(&url.URL{Path: path}).String())
-}
-
 func (a *AIPlanMemAPI) postRequest(path string) error {
 	resp, err := http.Post(a.addr.ResolveReference(&url.URL{Path: path}).String(), "", nil)
 	if err != nil {
@@ -139,13 +124,13 @@ func (a *AIPlanMemAPI) postRequest(path string) error {
 	return nil
 }
 
-func (a *AIPlanMemAPI) postRequestWithBody(path string, body []byte) error {
-	resp, err := http.Post(a.addr.ResolveReference(&url.URL{Path: path}).String(), "application/json", bytes.NewReader(body))
+func (a *AIPlanMemAPI) postRequestWithResponseHeader(path string) (http.Header, error) {
+	resp, err := http.Post(a.addr.ResolveReference(&url.URL{Path: path}).String(), "", nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return nil
+	return resp.Header, nil
 }
 
 func (a *AIPlanMemAPI) postRequestWithResponse(path string, body []byte) (*http.Response, error) {
