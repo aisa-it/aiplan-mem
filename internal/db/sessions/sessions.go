@@ -40,7 +40,7 @@ func (ss SessionsStore) IsTokenBlacklisted(signature []byte) (bool, error) {
 			return nil
 		}
 		t := time.Unix(int64(binary.LittleEndian.Uint64(timeRaw)), 0)
-		blacklisted = t.After(t.Add(time.Minute)) // Freeze for 1 minute for all async requests
+		blacklisted = t.After(t.Add(time.Minute * 5)) // Freeze for 5 minutes for all async requests
 		return nil
 	})
 	return blacklisted, err
