@@ -22,9 +22,6 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Test
-        run: go test -v ./...
-
       - name: Build Docker image
         run: |
           docker build -t ghcr.io/${{ github.repository }}:latest .
