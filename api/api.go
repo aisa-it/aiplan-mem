@@ -1,7 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
+	"github.com/aisa-it/aiplan-mem/internal/dao"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -70,6 +74,38 @@ func (a *AIPlanMemAPI) GetUserLastSeenTime(userId uuid.UUID) (time.Time, error) 
 	return time.Unix(int64(t), 0), err
 }
 
+// EmailCodes methods
+func (a *AIPlanMemAPI) SaveEmailCode(userID uuid.UUID, newEmail string) (string, error) {
+	if a.isModule {
+		return a.ds.EmailCodes.GenCode(userID, newEmail)
+	}
+
+	h, err := a.postRequestWithResponseHeader("/emailCodes/" + userID.String() + "?email=" + url.QueryEscape(newEmail))
+	return h.Get("code"), err
+}
+
+func (a *AIPlanMemAPI) VerifyEmailCode(userID uuid.UUID, email, code string) (bool, error) {
+	if a.isModule {
+		return a.ds.EmailCodes.VerifyCode(userID, email, code)
+	}
+
+	data := dao.EmailCodeData{
+		NewEmail:  email,
+		Code:      code,
+		CreatedAt: time.Now(),
+	}
+	jsonData, _ := json.Marshal(data)
+
+	resp, err := a.postRequestWithResponse("/emailCodes/"+userID.String()+"/verify", jsonData)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	return resp.Header.Get("verify") == "true", nil
+}
+
+//-------------------
+
 func (a *AIPlanMemAPI) getRequest(path string) (http.Header, error) {
 	resp, err := http.Get(a.addr.ResolveReference(&url.URL{Path: path}).String())
 	if err != nil {
@@ -86,4 +122,22 @@ func (a *AIPlanMemAPI) postRequest(path string) error {
 	}
 	defer resp.Body.Close()
 	return nil
+}
+
+func (a *AIPlanMemAPI) postRequestWithResponseHeader(path string) (http.Header, error) {
+	resp, err := http.Post(a.addr.ResolveReference(&url.URL{Path: path}).String(), "", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return resp.Header, nil
+}
+
+func (a *AIPlanMemAPI) postRequestWithResponse(path string, body []byte) (*http.Response, error) {
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+
+	return http.Post(a.addr.ResolveReference(&url.URL{Path: path}).String(), "application/json", reader)
 }

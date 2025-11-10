@@ -2,11 +2,13 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/aisa-it/aiplan-mem/internal/config"
+	"github.com/aisa-it/aiplan-mem/internal/dao"
 	"github.com/aisa-it/aiplan-mem/internal/db"
 	"github.com/gofrs/uuid/v5"
 	"github.com/labstack/echo/v4"
@@ -32,6 +34,12 @@ func RunServer(cfg *config.Config, ds *db.DataStore) {
 	{
 		lastSeenGroup.GET("/:userId", s.getUserLastSeen)
 		lastSeenGroup.POST("/:userId", s.postUserLastSeen)
+	}
+
+	emailCodeGroup := e.Group("/emailCodes")
+	{
+		emailCodeGroup.POST("/:userId/verify", s.verifyEmailCode)
+		emailCodeGroup.POST("/:userId", s.saveEmailCode)
 	}
 
 	if err := e.Start(cfg.ListenAddr); err != nil {
@@ -88,5 +96,37 @@ func (s *Server) postUserLastSeen(c echo.Context) error {
 	if err := s.DataStore.Sessions.SaveUserLastSeenTime(userId); err != nil {
 		return sendError(c, err)
 	}
+	return c.NoContent(http.StatusOK)
+}
+
+// EmailCodes handlers
+
+func (s *Server) saveEmailCode(c echo.Context) error {
+	userId := uuid.FromStringOrNil(c.Param("userId"))
+	email := c.QueryParam("email")
+
+	code, err := s.DataStore.EmailCodes.GenCode(userId, email)
+	if err != nil {
+		return sendError(c, err)
+	}
+
+	c.Response().Header().Set("code", fmt.Sprint(code))
+	return c.NoContent(http.StatusOK)
+}
+
+func (s *Server) verifyEmailCode(c echo.Context) error {
+	userId := uuid.FromStringOrNil(c.Param("userId"))
+
+	var req dao.EmailCodeData
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return sendError(c, err)
+	}
+
+	verify, err := s.DataStore.EmailCodes.VerifyCode(userId, req.NewEmail, req.Code)
+	if err != nil {
+		return sendError(c, err)
+	}
+
+	c.Response().Header().Set("verify", fmt.Sprint(verify))
 	return c.NoContent(http.StatusOK)
 }

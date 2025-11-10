@@ -32,4 +32,5 @@ go.work.sum
 # .vscode/
 
 bin/
+.idea
 aiplan_mem.db
