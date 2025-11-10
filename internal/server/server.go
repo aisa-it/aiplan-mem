@@ -4,13 +4,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net/http"
+
 	"github.com/aisa-it/aiplan-mem/internal/config"
 	"github.com/aisa-it/aiplan-mem/internal/dao"
 	"github.com/aisa-it/aiplan-mem/internal/db"
 	"github.com/gofrs/uuid/v5"
 	"github.com/labstack/echo/v4"
-	"log/slog"
-	"net/http"
 )
 
 type Server struct {
@@ -123,7 +124,7 @@ func (s *Server) verifyEmailCode(c echo.Context) error {
 
 	verify, err := s.DataStore.EmailCodes.VerifyCode(userId, req.NewEmail, req.Code)
 	if err != nil {
-		c.Response().Header().Set("error", fmt.Sprint(err.Error()))
+		return sendError(c, err)
 	}
 
 	c.Response().Header().Set("verify", fmt.Sprint(verify))
