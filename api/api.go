@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/aisa-it/aiplan-mem/internal/dao"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/aisa-it/aiplan-mem/internal/dao"
 
 	"github.com/aisa-it/aiplan-mem/internal/config"
 	"github.com/aisa-it/aiplan-mem/internal/db"
@@ -79,8 +80,10 @@ func (a *AIPlanMemAPI) SaveEmailCode(userID uuid.UUID, newEmail string) (string,
 	if a.isModule {
 		return a.ds.EmailCodes.GenCode(userID, newEmail)
 	}
+	h := http.Header{}
+	h.Set("email", newEmail)
 
-	h, err := a.postRequestWithResponseHeader("/emailCodes/" + userID.String() + "?email=" + url.QueryEscape(newEmail))
+	h, err := a.postRequestWithResponseHeader("/emailCodes/"+userID.String(), h)
 	return h.Get("code"), err
 }
 
@@ -124,13 +127,20 @@ func (a *AIPlanMemAPI) postRequest(path string) error {
 	return nil
 }
 
-func (a *AIPlanMemAPI) postRequestWithResponseHeader(path string) (http.Header, error) {
-	resp, err := http.Post(a.addr.ResolveReference(&url.URL{Path: path}).String(), "", nil)
+func (a *AIPlanMemAPI) postRequestWithResponseHeader(path string, header http.Header) (http.Header, error) {
+	req, err := http.NewRequest("POST", a.addr.ResolveReference(&url.URL{Path: path}).String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = header
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	return resp.Header, nil
+
 }
 
 func (a *AIPlanMemAPI) postRequestWithResponse(path string, body []byte) (*http.Response, error) {
