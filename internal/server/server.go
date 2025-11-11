@@ -103,7 +103,7 @@ func (s *Server) postUserLastSeen(c echo.Context) error {
 
 func (s *Server) saveEmailCode(c echo.Context) error {
 	userId := uuid.FromStringOrNil(c.Param("userId"))
-	email := c.QueryParam("email")
+	email := c.Request().Header.Get("email")
 
 	code, err := s.DataStore.EmailCodes.GenCode(userId, email)
 	if err != nil {
