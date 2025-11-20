@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -18,6 +19,8 @@ func TestModuleBlacklist(t *testing.T) {
 	assert.False(t, b)
 
 	assert.NoError(t, c.BlacklistToken([]byte("test")))
+	time.Sleep(time.Second * 20)
+	fmt.Println(time.Now())
 
 	b, err = c.IsTokenBlacklisted([]byte("test"))
 	assert.NoError(t, err)
@@ -25,7 +28,7 @@ func TestModuleBlacklist(t *testing.T) {
 
 	assert.NoError(t, c.Close())
 
-	os.Remove("test.db")
+	os.RemoveAll("test.db")
 }
 
 func TestModuleLastSeen(t *testing.T) {

@@ -93,9 +93,8 @@ func (a *AIPlanMemAPI) VerifyEmailCode(userID uuid.UUID, email, code string) (bo
 	}
 
 	data := dao.EmailCodeData{
-		NewEmail:  email,
-		Code:      code,
-		CreatedAt: time.Now(),
+		NewEmail: email,
+		Code:     code,
 	}
 	jsonData, _ := json.Marshal(data)
 
